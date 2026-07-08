@@ -158,6 +158,38 @@ function TakeAttendance({ students }: { students: Student[] }) {
   const [date, setDate] = useState(todayISO());
   const [marks, setMarks] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
+  const [isHoliday, setIsHoliday] = useState(false);
+  const [holidayReason, setHolidayReason] = useState("");
+  const [holidayId, setHolidayId] = useState<string | null>(null);
+  const [holidayDialogOpen, setHolidayDialogOpen] = useState(false);
+  const [newHolidayReason, setNewHolidayReason] = useState("");
+
+  const checkHolidayStatus = useCallback(async (selectedDate: string) => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id;
+      if (uid) {
+        const { data: hData } = await supabase
+          .from("holidays")
+          .select("id,reason")
+          .eq("teacher_id", uid)
+          .eq("holiday_date", selectedDate)
+          .maybeSingle();
+
+        if (hData) {
+          setIsHoliday(true);
+          setHolidayReason(hData.reason || "Holiday");
+          setHolidayId(hData.id);
+        } else {
+          setIsHoliday(false);
+          setHolidayReason("");
+          setHolidayId(null);
+        }
+      }
+    } catch (err) {
+      console.error("Error checking holiday status:", err);
+    }
+  }, []);
 
   useEffect(() => {
     if (students.length === 0) return;
@@ -168,8 +200,9 @@ function TakeAttendance({ students }: { students: Student[] }) {
       students.forEach(s => { m[s.id] = 1; });
       (data ?? []).forEach((r: { student_id: string; status: number }) => { m[r.student_id] = Number(r.status); });
       setMarks(m);
+      await checkHolidayStatus(date);
     })();
-  }, [date, students]);
+  }, [date, students, checkHolidayStatus]);
 
   const set = (id: string, v: number) => setMarks(prev => ({ ...prev, [id]: v }));
 
@@ -182,18 +215,80 @@ function TakeAttendance({ students }: { students: Student[] }) {
     toast.success("Attendance saved");
   };
 
+  const handleAddHoliday = async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    const uid = userData.user?.id;
+    if (!uid) return;
+    
+    const { error } = await supabase.from("holidays").insert({
+      teacher_id: uid,
+      holiday_date: date,
+      reason: newHolidayReason.trim() || null
+    });
+    
+    if (error) return toast.error(error.message);
+    toast.success("Holiday marked for this date");
+    setHolidayDialogOpen(false);
+    setNewHolidayReason("");
+    await checkHolidayStatus(date);
+  };
+
+  const handleRemoveHoliday = async () => {
+    if (!holidayId) return;
+    const { error } = await supabase.from("holidays").delete().eq("id", holidayId);
+    if (error) return toast.error(error.message);
+    toast.success("Holiday removed");
+    await checkHolidayStatus(date);
+  };
+
   if (students.length === 0) return <Card><CardContent className="py-10 text-center text-muted-foreground">Add students first.</CardContent></Card>;
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
-        <div><CardTitle>Roll call</CardTitle><CardDescription>Mark each student. 1 = Present, 0.5 = Half day, 0 = Absent.</CardDescription></div>
+        <div>
+          <CardTitle>Roll call</CardTitle>
+          <CardDescription>Mark each student. 1 = Present, 0.5 = Half day, 0 = Absent.</CardDescription>
+        </div>
         <div className="flex items-end gap-2">
           <div><Label>Date</Label><Input type="date" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value)} /></div>
-          <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+          {!isHoliday ? (
+            <Dialog open={holidayDialogOpen} onOpenChange={setHolidayDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="border-orange-200 hover:bg-orange-50 text-orange-700 hover:text-orange-900">
+                  Mark as Holiday
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Mark {new Date(date).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })} as a Holiday</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3 py-2">
+                  <Label>Reason (optional)</Label>
+                  <Input value={newHolidayReason} onChange={(e) => setNewHolidayReason(e.target.value)} placeholder="e.g. Convocation, Festival" />
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setHolidayDialogOpen(false)}>Cancel</Button>
+                  <Button className="bg-orange-600 hover:bg-orange-700 text-white" onClick={handleAddHoliday}>Mark Holiday</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          ) : null}
+          <Button onClick={save} disabled={saving || isHoliday}>{saving ? "Saving…" : "Save"}</Button>
         </div>
       </CardHeader>
-      <CardContent>
+      {isHoliday && (
+        <div className="mx-6 p-4 bg-orange-50 border border-orange-200 text-orange-800 rounded-xl flex items-center justify-between text-sm">
+          <span className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse" />
+            <span>This date is marked as a <strong>Holiday ({holidayReason})</strong>. Attendance values are ignored for metrics on holidays.</span>
+          </span>
+          <Button size="sm" variant="ghost" className="text-orange-800 hover:text-red-700 hover:bg-orange-100" onClick={handleRemoveHoliday}>
+            Remove Holiday
+          </Button>
+        </div>
+      )}
+      <CardContent className={isHoliday ? "opacity-60" : ""}>
         <ul className="divide-y">
           {students.map((s) => {
             const v = marks[s.id] ?? 1;
@@ -201,11 +296,17 @@ function TakeAttendance({ students }: { students: Student[] }) {
               <li key={s.id} className="py-3 flex items-center justify-between gap-4">
                 <div><p className="font-medium">{s.name}</p><p className="text-xs text-muted-foreground">{s.email}</p></div>
                 <div className="flex gap-1">
-                  {[{v:1,l:"P"},{v:0.5,l:"½"},{v:0,l:"A"}].map(opt => (
-                    <Button key={opt.v} size="sm" variant={v === opt.v ? "default" : "outline"} onClick={() => set(s.id, opt.v)}>
-                      {opt.l}
-                    </Button>
-                  ))}
+                  {isHoliday ? (
+                    <span className="text-xs font-semibold px-3 py-1.5 bg-muted text-muted-foreground rounded-lg border">
+                      Holiday (H)
+                    </span>
+                  ) : (
+                    [{v:1,l:"P"},{v:0.5,l:"½"},{v:0,l:"A"}].map(opt => (
+                      <Button key={opt.v} size="sm" variant={v === opt.v ? "default" : "outline"} onClick={() => set(s.id, opt.v)}>
+                        {opt.l}
+                      </Button>
+                    ))
+                  )}
                 </div>
               </li>
             );
