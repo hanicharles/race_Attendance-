@@ -6,14 +6,63 @@ import * as path from "node:path";
 const dbDir = process.cwd();
 const dbPath = path.join(dbDir, "sqlite.db");
 
-const connectionUrl = process.env.TURSO_CONNECTION_URL || `file:${dbPath}`;
-const authToken = process.env.TURSO_AUTH_TOKEN || "";
+let dbInstance: any = null;
+let isInitialized = false;
 
-console.log(`[SQLite Server] Connecting to database URL: ${connectionUrl}`);
+function getDb() {
+  if (dbInstance) return dbInstance;
 
-const db = createClient({
-  url: connectionUrl,
-  authToken: authToken,
+  const connectionUrl = process.env.TURSO_CONNECTION_URL || `file:${dbPath}`;
+  const authToken = process.env.TURSO_AUTH_TOKEN || "";
+
+  console.log(`[SQLite Server] Lazy-initializing database client: ${connectionUrl}`);
+
+  try {
+    const isCloudflare = typeof globalThis !== "undefined" && !(globalThis as any).process?.versions?.node;
+    if (isCloudflare && !process.env.TURSO_CONNECTION_URL) {
+      console.warn("[SQLite Server] Running in Cloudflare but TURSO_CONNECTION_URL is not set. Database client mocked.");
+      dbInstance = {
+        execute: async () => {
+          throw new Error("Database not configured. Please set TURSO_CONNECTION_URL and TURSO_AUTH_TOKEN environment variables in your Cloudflare dashboard.");
+        }
+      };
+    } else {
+      dbInstance = createClient({
+        url: connectionUrl,
+        authToken: authToken,
+      });
+    }
+  } catch (err: any) {
+    console.error("[SQLite Server] Failed to initialize database client:", err);
+    dbInstance = {
+      execute: async () => {
+        throw new Error("Database connection error: " + err.message);
+      }
+    };
+  }
+
+  return dbInstance;
+}
+
+// Proxied database client to lazily load and initialize the schema on the first query
+const db = new Proxy({} as any, {
+  get(target, prop) {
+    return async (...args: any[]) => {
+      const client = getDb();
+      if (!isInitialized) {
+        isInitialized = true;
+        try {
+          await initDb();
+        } catch (err) {
+          console.error("[SQLite Server] Lazy schema initialization failed:", err);
+        }
+      }
+      if (typeof client[prop] === "function") {
+        return client[prop](...args);
+      }
+      return client[prop];
+    };
+  }
 });
 
 // Setup schema tables
@@ -333,8 +382,7 @@ async function initDb() {
   }
 }
 
-// Initialise DB in background
-initDb();
+// DB initialization is now triggered lazily on the first query
 
 function hashPassword(password: string): string {
   return crypto.createHash("sha256").update(password).digest("hex");
