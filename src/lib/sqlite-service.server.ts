@@ -18,12 +18,16 @@ function getDb() {
   console.log(`[SQLite Server] Lazy-initializing database client: ${connectionUrl}`);
 
   try {
-    const isCloudflare = typeof globalThis !== "undefined" && !(globalThis as any).process?.versions?.node;
+    const isCloudflare = typeof globalThis !== "undefined" && (
+      !(globalThis as any).process?.versions?.node ||
+      (globalThis as any).navigator?.userAgent === "Cloudflare-Workers" ||
+      (globalThis as any).process?.env?.CF_PAGES === "1"
+    );
     if (isCloudflare && !process.env.TURSO_CONNECTION_URL) {
       console.warn("[SQLite Server] Running in Cloudflare but TURSO_CONNECTION_URL is not set. Database client mocked.");
       dbInstance = {
         execute: async () => {
-          throw new Error("Database not configured. Please set TURSO_CONNECTION_URL and TURSO_AUTH_TOKEN environment variables in your Cloudflare dashboard.");
+          throw new Error("Database not configured. Since you are deploying to a serverless platform (like Cloudflare Pages), a local SQLite file database cannot be used. Please set up a hosted SQLite database (such as Turso) and configure the TURSO_CONNECTION_URL and TURSO_AUTH_TOKEN environment variables in your Cloudflare Pages dashboard settings (under Settings -> Environment Variables). See the cloudflare_deployment.md file in your project for step-by-step instructions.");
         }
       };
     } else {
@@ -34,9 +38,13 @@ function getDb() {
     }
   } catch (err: any) {
     console.error("[SQLite Server] Failed to initialize database client:", err);
+    let message = err.message || "";
+    if (connectionUrl.startsWith("file:") && (message.includes("URL_SCHEME_NOT_SUPPORTED") || message.includes("only supports"))) {
+      message = "Database not configured. Since you are deploying to a serverless platform (like Cloudflare Pages), a local SQLite file database cannot be used. Please set up a hosted SQLite database (such as Turso) and configure the TURSO_CONNECTION_URL and TURSO_AUTH_TOKEN environment variables in your Cloudflare Pages dashboard settings (under Settings -> Environment Variables). See the cloudflare_deployment.md file in your project for step-by-step instructions.";
+    }
     dbInstance = {
       execute: async () => {
-        throw new Error("Database connection error: " + err.message);
+        throw new Error("Database connection error: " + message);
       }
     };
   }
