@@ -45,8 +45,17 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+function isPublicAsset(pathname: string): boolean {
+  return pathname.startsWith("/assets/") || pathname === "/favicon.ico" || pathname === "/robots.txt";
+}
+
 export default {
-  async fetch(request: Request, env: unknown, ctx: unknown) {
+  async fetch(request: Request, env: any, ctx: unknown) {
+    const url = new URL(request.url);
+    if (env?.ASSETS && isPublicAsset(url.pathname)) {
+      return env.ASSETS.fetch(request);
+    }
+
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
