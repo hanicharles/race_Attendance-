@@ -46,7 +46,7 @@ function isH3SwallowedErrorBody(body: string): boolean {
 }
 
 function isPublicAsset(pathname: string): boolean {
-  return pathname.startsWith("/assets/") || pathname === "/favicon.ico" || pathname === "/robots.txt";
+  return pathname.startsWith("/assets/") || pathname === "/favicon.ico" || pathname === "/logo.png" || pathname === "/robots.txt";
 }
 
 export default {

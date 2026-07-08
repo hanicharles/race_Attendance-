@@ -39,10 +39,8 @@ function AuthPage() {
     <div className="min-h-screen bg-background flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
         <Link to="/" className="mb-6 flex items-center gap-2 justify-center font-semibold text-lg">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <CalendarCheck className="h-4 w-4" />
-          </span>
-          AttendPro
+          <img src="/logo.png" className="h-8 w-8 object-contain" alt="REVA RACE Logo" />
+          <span>REVA RACE</span>
         </Link>
         <Card className="shadow-lg">
           <CardHeader>

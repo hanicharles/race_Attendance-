@@ -22,10 +22,8 @@ export function AppHeader({ title }: { title?: string }) {
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <div className="flex items-center gap-4">
           <Link to="/" className="flex items-center gap-2 font-semibold">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <CalendarCheck className="h-4 w-4" />
-            </span>
-            AttendPro
+            <img src="/logo.png" className="h-8 w-8 object-contain" alt="REVA RACE Logo" />
+            <span>REVA RACE</span>
           </Link>
           {title && <span className="hidden sm:inline text-sm text-muted-foreground">/ {title}</span>}
         </div>

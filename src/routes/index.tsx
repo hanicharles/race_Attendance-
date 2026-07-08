@@ -53,9 +53,7 @@ function Landing() {
       <header className="border-b bg-card/60 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link to="/" className="flex items-center gap-3 font-semibold">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#B8202E] text-white font-bold">
-              R
-            </span>
+            <img src="/logo.png" className="h-10 w-10 object-contain" alt="REVA RACE Logo" />
             <span className="flex flex-col leading-tight">
               <span className="text-base">REVA RACE</span>
               <span className="text-[11px] font-normal text-muted-foreground">
@@ -244,9 +242,7 @@ function Landing() {
       <footer className="border-t bg-[#0B1E3F] text-white/80">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-6 py-8 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-[#B8202E] text-white font-bold">
-              R
-            </span>
+            <img src="/logo.png" className="h-8 w-8 object-contain" alt="REVA RACE Logo" />
             <div className="text-sm">
               <div className="font-semibold text-white">REVA RACE Attendance Portal</div>
               <div className="text-xs text-white/60">
