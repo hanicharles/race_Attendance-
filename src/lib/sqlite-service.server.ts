@@ -764,17 +764,21 @@ export async function handleDbQuery(query: any = {}) {
     if (action === "insert") {
       const id = data.id || crypto.randomUUID();
       const now = new Date().toISOString();
-      const record = {
+      const record: any = {
         id,
-        created_at: now,
         ...data,
       };
 
-      if (table === "leave_requests") {
-        (record as any).updated_at = now;
+      const tablesWithoutCreatedAt = ["holidays", "user_roles", "sessions"];
+      if (!tablesWithoutCreatedAt.includes(table)) {
+        record.created_at = now;
       }
 
-      delete (record as any).updated_at_column;
+      if (table === "leave_requests") {
+        record.updated_at = now;
+      }
+
+      delete record.updated_at_column;
 
       const cols = Object.keys(record);
       const vals = Object.values(record);
