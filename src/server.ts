@@ -49,9 +49,32 @@ function isPublicAsset(pathname: string): boolean {
   return pathname.startsWith("/assets/") || pathname === "/favicon.ico" || pathname === "/logo.png" || pathname === "/robots.txt";
 }
 
+function isLastDayOfMonth() {
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  return tomorrow.getDate() === 1;
+}
+
 export default {
-  async fetch(request: Request, env: any, ctx: unknown) {
+  async fetch(request: Request, env: any, ctx: any) {
     const url = new URL(request.url);
+
+    // API route to manually trigger/test sending of monthly attendance reports
+    if (url.pathname === "/api/trigger-monthly-reports") {
+      const secret = url.searchParams.get("secret");
+      if (secret === "race123") {
+        const { sendMonthlyAttendanceReports } = await import("./lib/sqlite-service.server");
+        ctx.waitUntil(sendMonthlyAttendanceReports());
+        return new Response(JSON.stringify({ success: true, message: "Monthly report generation triggered successfully in the background." }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      } else {
+        return new Response("Unauthorized", { status: 401 });
+      }
+    }
+
     if (env?.ASSETS && isPublicAsset(url.pathname)) {
       return env.ASSETS.fetch(request);
     }
@@ -68,4 +91,12 @@ export default {
       });
     }
   },
+
+  async scheduled(event: any, env: any, ctx: any) {
+    // Run daily at midnight, but only execute emails on the last day of the month
+    if (isLastDayOfMonth()) {
+      const { sendMonthlyAttendanceReports } = await import("./lib/sqlite-service.server");
+      ctx.waitUntil(sendMonthlyAttendanceReports());
+    }
+  }
 };

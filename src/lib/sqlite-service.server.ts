@@ -852,6 +852,34 @@ export async function handleDbQuery(query: any = {}) {
         const cols = Object.keys(record);
         const vals = Object.values(record);
 
+        // Check if student is being newly marked absent
+        let shouldSendAbsentEmail = false;
+        let studentDetails: { name: string; email: string } | null = null;
+
+        if (table === "attendance" && Number(row.status) === 0) {
+          try {
+            const prevRes = await db.execute({
+              sql: "SELECT status FROM attendance WHERE student_id = ? AND date = ?",
+              args: [row.student_id, row.date]
+            });
+            const hasRecord = prevRes.rows && prevRes.rows.length > 0;
+            const prevStatus = hasRecord ? Number(prevRes.rows[0].status) : null;
+
+            if (!hasRecord || prevStatus !== 0) {
+              const studentRes = await db.execute({
+                sql: "SELECT name, email FROM students WHERE id = ?",
+                args: [row.student_id]
+              });
+              if (studentRes.rows && studentRes.rows.length > 0) {
+                studentDetails = studentRes.rows[0] as { name: string; email: string };
+                shouldSendAbsentEmail = true;
+              }
+            }
+          } catch (e) {
+            console.error("Error pre-checking attendance status:", e);
+          }
+        }
+
         let sql = `INSERT INTO ${table} (${cols.join(",")}) VALUES (${cols.map(() => "?").join(",")})`;
 
         if (table === "attendance") {
@@ -863,6 +891,24 @@ export async function handleDbQuery(query: any = {}) {
         }
 
         await db.execute({ sql, args: vals });
+
+        // Trigger absent email sending asynchronously if flagged
+        if (shouldSendAbsentEmail && studentDetails) {
+          const subject = `Absent Notification - ${row.date}`;
+          const html = `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px; color: #333; line-height: 1.6;">
+              <h2 style="color: #e11d48; border-bottom: 2px solid #e11d48; padding-bottom: 10px; margin-top: 0;">Absent Alert</h2>
+              <p>Hello <strong>${studentDetails.name}</strong>,</p>
+              <p>This is to notify you that you have been marked <strong>Absent</strong> for your class on <strong>${row.date}</strong>.</p>
+              <p>If you believe this is an error, please coordinate with your faculty as soon as possible.</p>
+              <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0 15px 0;" />
+              <p style="font-size: 11px; color: #888; text-align: center;">This is an automated notification from the REVA RACE Student Hub Attendance System.</p>
+            </div>
+          `;
+          sendMail({ to: studentDetails.email, subject, html }).catch(err => {
+            console.error("Error in async absent mail:", err);
+          });
+        }
       }
 
       return { data, error: null };
@@ -874,3 +920,156 @@ export async function handleDbQuery(query: any = {}) {
     return { data: null, error: { message: e.message || "Database execution error", code: e.code } };
   }
 }
+
+export async function sendMail(options: { to: string; subject: string; html: string }) {
+  const apiKey = typeof process !== "undefined" ? process.env.RESEND_API_KEY : undefined;
+  if (!apiKey) {
+    console.log(`[Email Mock] To: ${options.to}, Subject: ${options.subject}\nBody: ${options.html}`);
+    return;
+  }
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "Attendance System <onboarding@resend.dev>",
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+      }),
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`Failed to send email to ${options.to}:`, errText);
+    } else {
+      console.log(`Email successfully sent to ${options.to}`);
+    }
+  } catch (error) {
+    console.error("Error sending email:", error);
+  }
+}
+
+export async function sendMonthlyAttendanceReports() {
+  console.log("Starting automated monthly attendance report generation...");
+  
+  // 1. Get current month information
+  const today = new Date();
+  const year = today.getFullYear();
+  const monthNum = today.getMonth() + 1; // 1-12
+  const monthStr = String(monthNum).padStart(2, '0');
+  const yearStr = String(year);
+
+  // 2. Query all students
+  const studentsRes = await db.execute("SELECT id, name, email FROM students");
+  const students = studentsRes.rows as Array<{ id: string; name: string; email: string }>;
+
+  for (const student of students) {
+    // Query attendance for this student in this month
+    const attRes = await db.execute({
+      sql: `SELECT date, status FROM attendance 
+            WHERE student_id = ? 
+            AND date LIKE ?
+            ORDER BY date ASC`,
+      args: [student.id, `${yearStr}-${monthStr}-%`]
+    });
+    
+    const records = attRes.rows as Array<{ date: string; status: number }>;
+    
+    // Check if any date in this month was marked as a holiday
+    const holidaysRes = await db.execute("SELECT holiday_date FROM holidays");
+    const holidays = new Set((holidaysRes.rows ?? []).map((h: any) => h.holiday_date));
+    
+    // Exclude holidays from class count
+    const activeRecords = records.filter(r => !holidays.has(r.date));
+    
+    const totalClasses = activeRecords.length;
+    if (totalClasses === 0) {
+      console.log(`Skipping monthly email for ${student.name} (no classes this month).`);
+      continue;
+    }
+    
+    let classesAttended = 0;
+    activeRecords.forEach(r => {
+      if (Number(r.status) === 1) classesAttended += 1;
+      else if (Number(r.status) === 0.5) classesAttended += 0.5;
+    });
+    
+    const percentage = Math.round((classesAttended / totalClasses) * 100);
+    
+    // Generate HTML table for attendance logs
+    const logsHtml = activeRecords
+      .map(r => {
+        let statusText = "Absent";
+        let color = "#e11d48";
+        if (Number(r.status) === 1) {
+          statusText = "Present";
+          color = "#16a34a";
+        } else if (Number(r.status) === 0.5) {
+          statusText = "Half Day";
+          color = "#eab308";
+        }
+        return `
+          <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;">${r.date}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee; color: ${color}; font-weight: bold;">${statusText}</td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+    const monthName = monthNames[today.getMonth()];
+
+    const subject = `Monthly Attendance Report - ${monthName} ${year}`;
+    const html = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px; color: #333; line-height: 1.6;">
+        <h2 style="color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; margin-top: 0;">Monthly Attendance Report</h2>
+        <p>Hello <strong>${student.name}</strong>,</p>
+        <p>Here is your attendance summary for the month of <strong>${monthName} ${year}</strong>:</p>
+        
+        <div style="background-color: #f8fafc; padding: 15px; border-radius: 6px; margin: 20px 0; display: flex; justify-content: space-around; border: 1px solid #e2e8f0;">
+          <div style="text-align: center; flex: 1;">
+            <span style="font-size: 14px; color: #64748b; display: block;">Total Classes</span>
+            <strong style="font-size: 24px; color: #1e293b;">${totalClasses}</strong>
+          </div>
+          <div style="text-align: center; flex: 1; border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1;">
+            <span style="font-size: 14px; color: #64748b; display: block;">Attended</span>
+            <strong style="font-size: 24px; color: #1e293b;">${classesAttended}</strong>
+          </div>
+          <div style="text-align: center; flex: 1;">
+            <span style="font-size: 14px; color: #64748b; display: block;">Percentage</span>
+            <strong style="font-size: 24px; color: ${percentage >= 75 ? '#16a34a' : '#e11d48'};">${percentage}%</strong>
+          </div>
+        </div>
+
+        <h3 style="color: #475569; margin-top: 25px;">Detailed Log</h3>
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+          <thead>
+            <tr style="background-color: #f1f5f9;">
+              <th style="padding: 10px; border-bottom: 2px solid #cbd5e1;">Date</th>
+              <th style="padding: 10px; border-bottom: 2px solid #cbd5e1;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${logsHtml}
+          </tbody>
+        </table>
+
+        <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0 20px 0;" />
+        <p style="font-size: 12px; color: #888; text-align: center;">This is an automated notification from the REVA RACE Student Hub Attendance System.</p>
+      </div>
+    `;
+    
+    await sendMail({ to: student.email, subject, html });
+  }
+  
+  console.log("All monthly attendance reports sent successfully!");
+}
+
