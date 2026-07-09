@@ -75,6 +75,49 @@ export default {
       }
     }
 
+    // Diagnostics API route to test Resend integration live
+    if (url.pathname === "/api/test-email") {
+      const to = url.searchParams.get("to") || "chalukyanayakbk2@gmail.com";
+      try {
+        const apiKey = env?.RESEND_API_KEY || (typeof process !== "undefined" ? process.env.RESEND_API_KEY : undefined);
+        if (!apiKey) {
+          return new Response(JSON.stringify({ error: "RESEND_API_KEY is not defined in worker env." }), {
+            status: 400,
+            headers: { "content-type": "application/json" }
+          });
+        }
+        
+        const res = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: "Attendance System <onboarding@resend.dev>",
+            to,
+            subject: "Test Email from Worker",
+            html: "<p>If you see this, email sending works perfectly!</p>",
+          }),
+        });
+        
+        const resText = await res.text();
+        return new Response(JSON.stringify({
+          status: res.status,
+          response: JSON.parse(resText),
+          ok: res.ok
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
+          headers: { "content-type": "application/json" }
+        });
+      }
+    }
+
     if (env?.ASSETS && isPublicAsset(url.pathname)) {
       return env.ASSETS.fetch(request);
     }
