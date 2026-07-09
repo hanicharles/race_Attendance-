@@ -80,6 +80,7 @@ export default {
       const to = url.searchParams.get("to") || "chalukyanayakbk2@gmail.com";
       try {
         const apiKey = env?.RESEND_API_KEY || (typeof process !== "undefined" ? process.env.RESEND_API_KEY : undefined);
+        const fromEmail = env?.RESEND_FROM_EMAIL || (typeof process !== "undefined" ? process.env.RESEND_FROM_EMAIL : undefined) || "Attendance System <onboarding@resend.dev>";
         if (!apiKey) {
           return new Response(JSON.stringify({ error: "RESEND_API_KEY is not defined in worker env." }), {
             status: 400,
@@ -94,7 +95,7 @@ export default {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: "Attendance System <onboarding@resend.dev>",
+            from: fromEmail,
             to,
             subject: "Test Email from Worker",
             html: "<p>If you see this, email sending works perfectly!</p>",

@@ -923,6 +923,7 @@ export async function handleDbQuery(query: any = {}) {
 
 export async function sendMail(options: { to: string; subject: string; html: string }) {
   const apiKey = typeof process !== "undefined" ? process.env.RESEND_API_KEY : undefined;
+  const fromEmail = (typeof process !== "undefined" ? process.env.RESEND_FROM_EMAIL : undefined) || "Attendance System <onboarding@resend.dev>";
   if (!apiKey) {
     console.log(`[Email Mock] To: ${options.to}, Subject: ${options.subject}\nBody: ${options.html}`);
     return;
@@ -936,7 +937,7 @@ export async function sendMail(options: { to: string; subject: string; html: str
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "Attendance System <onboarding@resend.dev>",
+        from: fromEmail,
         to: options.to,
         subject: options.subject,
         html: options.html,
