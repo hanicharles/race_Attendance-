@@ -58,9 +58,29 @@ function ClassDetail() {
       <Link to="/teacher" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> Back to classes
       </Link>
-      <div>
-        <h1 className="text-3xl font-bold">{klass?.name ?? "…"}</h1>
-        <p className="text-muted-foreground">{[klass?.section, klass?.subject].filter(Boolean).join(" · ") || "—"}</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold">{klass?.name ?? "…"}</h1>
+          <p className="text-muted-foreground">{[klass?.section, klass?.subject].filter(Boolean).join(" · ") || "—"}</p>
+        </div>
+        <Button
+          variant="outline"
+          className="text-muted-foreground hover:text-destructive hover:border-destructive"
+          onClick={async () => {
+            if (klass && confirm(`Are you sure you want to delete the class "${klass.name}"? This will delete all student rosters and attendance records in this class.`)) {
+              const { error } = await supabase.from("classes").delete().eq("id", classId);
+              if (error) {
+                toast.error(error.message);
+              } else {
+                toast.success("Class deleted");
+                window.location.href = "/teacher";
+              }
+            }
+          }}
+        >
+          <Trash2 className="h-4 w-4 mr-1.5" />
+          Delete class
+        </Button>
       </div>
 
       <Tabs defaultValue="attendance">

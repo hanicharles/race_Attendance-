@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, BookOpen, CalendarDays, Users, UserCheck, UserX, TrendingDown, AlertTriangle, Percent, Mail } from "lucide-react";
+import { Plus, BookOpen, CalendarDays, Users, UserCheck, UserX, TrendingDown, AlertTriangle, Percent, Mail, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MONTH_NAMES } from "@/lib/attendance";
 
@@ -107,11 +107,33 @@ function TeacherHome() {
           {classes.map((c) => (
             <Link key={c.id} to="/teacher/class/$classId" params={{ classId: c.id }}>
               <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                <CardHeader>
-                  <CardTitle>{c.name}</CardTitle>
-                  <CardDescription>
-                    {[c.section, c.subject].filter(Boolean).join(" · ") || "No section / subject"}
-                  </CardDescription>
+                <CardHeader className="flex flex-row items-start justify-between space-y-0">
+                  <div className="space-y-1">
+                    <CardTitle>{c.name}</CardTitle>
+                    <CardDescription>
+                      {[c.section, c.subject].filter(Boolean).join(" · ") || "No section / subject"}
+                    </CardDescription>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0"
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (confirm(`Are you sure you want to delete the class "${c.name}"? This will delete all student rosters and attendance records in this class.`)) {
+                        const { error } = await supabase.from("classes").delete().eq("id", c.id);
+                        if (error) {
+                          toast.error(error.message);
+                        } else {
+                          toast.success("Class deleted");
+                          load();
+                        }
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </CardHeader>
               </Card>
             </Link>
