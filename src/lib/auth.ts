@@ -1,21 +1,28 @@
 import { useEffect, useState } from "react";
-import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
 export type Role = "teacher" | "student";
 
+export interface AuthSession {
+  access_token: string;
+  user: {
+    id: string;
+    email: string;
+  };
+}
+
 export function useAuth() {
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<AuthSession | null>(null);
   const [role, setRole] = useState<Role | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
-    const load = async (s: Session | null) => {
+    const load = async (s: AuthSession | null) => {
       if (!mounted) return;
       setSession(s);
       if (!s) {
-        setRole(null);
+        if (role !== null) setRole(null);
         setLoading(false);
         return;
       }
@@ -28,13 +35,15 @@ export function useAuth() {
       setRole((data?.role as Role) ?? null);
       setLoading(false);
     };
-    supabase.auth.getSession().then(({ data }) => load(data.session));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => load(s));
+    supabase.auth.getSession().then(({ data }) => load(data.session as AuthSession | null));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e: string, s: AuthSession | null) =>
+      load(s),
+    );
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
     };
-  }, []);
+  }, [role]);
 
   return { session, user: session?.user ?? null, role, loading };
 }

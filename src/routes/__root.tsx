@@ -80,9 +80,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "REVA RACE — Attendance Portal" },
-      { name: "description", content: "Official attendance portal for REVA RACE cohorts across Business Analytics, Cybersecurity, AI and Cloud programs." },
+      {
+        name: "description",
+        content:
+          "Official attendance portal for REVA RACE cohorts across Business Analytics, Cybersecurity, AI and Cloud programs.",
+      },
       { property: "og:title", content: "REVA RACE — Attendance Portal" },
-      { property: "og:description", content: "Attendance and cohort tracking for REVA University's School of Advanced Career Education." },
+      {
+        property: "og:description",
+        content:
+          "Attendance and cohort tracking for REVA University's School of Advanced Career Education.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -119,7 +127,7 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event: string) => {
       if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
       router.invalidate();
       if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
