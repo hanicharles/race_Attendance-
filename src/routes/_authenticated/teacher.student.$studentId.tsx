@@ -198,46 +198,36 @@ function StudentProfile() {
         />
       </div>
 
-      <div className="space-y-3">
-        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Overall Attendance
-        </h2>
-        <div className="grid gap-4 md:grid-cols-4">
-          <StatCard
-            label="Overall Attendance"
-            value={`${overall.percent}%`}
-            tone={overall.percent >= 90 ? "good" : overall.percent >= 75 ? "warn" : "bad"}
-            icon={<TrendingUp className="h-4 w-4" />}
-          />
-          <StatCard label="Overall Days marked" value={overall.marked} />
-          <StatCard label="Overall Present" value={overall.present} />
-          <StatCard
-            label="Overall Absent"
-            value={overall.absent}
-            hint={overall.half ? `${overall.half} half-day` : undefined}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Monthly Attendance — {MONTH_NAMES[month - 1]} {year}
-        </h2>
-        <div className="grid gap-4 md:grid-cols-4">
-          <StatCard
-            label="Monthly Attendance"
-            value={`${monthly.percent}%`}
-            tone={monthly.percent >= 90 ? "good" : monthly.percent >= 75 ? "warn" : "bad"}
-            icon={<TrendingUp className="h-4 w-4" />}
-          />
-          <StatCard label="Monthly Days marked" value={monthly.total} />
-          <StatCard label="Monthly Present" value={monthly.present} />
-          <StatCard
-            label="Monthly Absent"
-            value={monthly.absent}
-            hint={monthly.half ? `${monthly.half} half-day` : undefined}
-          />
-        </div>
+      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+        <StatCard
+          label="Attendance"
+          value={`${overall.percent}%`}
+          tone={overall.percent >= 90 ? "good" : overall.percent >= 75 ? "warn" : "bad"}
+          icon={<TrendingUp className="h-4 w-4" />}
+        />
+        <StatCard label="Days marked" value={overall.marked} />
+        <StatCard label="Present" value={overall.present} />
+        <StatCard
+          label="Absent"
+          value={overall.absent}
+          hint={overall.half ? `${overall.half} half-day` : undefined}
+        />
+        <StatCard
+          label="Monthly Attendance"
+          value={`${monthly.percent}%`}
+          tone={monthly.percent >= 90 ? "good" : monthly.percent >= 75 ? "warn" : "bad"}
+          icon={<TrendingUp className="h-4 w-4" />}
+          hint={`For ${MONTH_NAMES[month - 1]} ${year}`}
+        />
+        <StatCard
+          label="Monthly Absent"
+          value={monthly.absent}
+          hint={
+            monthly.half
+              ? `${monthly.half} half-day (For ${MONTH_NAMES[month - 1]} ${year})`
+              : `For ${MONTH_NAMES[month - 1]} ${year}`
+          }
+        />
       </div>
 
       <Card>
