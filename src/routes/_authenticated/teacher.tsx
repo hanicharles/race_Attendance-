@@ -27,6 +27,7 @@ import {
   Percent,
   Mail,
   Trash2,
+  Calculator,
 } from "lucide-react";
 import {
   Select,
@@ -244,9 +245,18 @@ function FacultyDashboard() {
   const [rows, setRows] = useState<RawRow[]>([]);
 
   const now = useMemo(() => new Date(), []);
-  const [viewMode, setViewMode] = useState<"all" | "month">("month");
+  const todayIso = useMemo(() => todayISO(), []);
+  const thirtyDaysAgoIso = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, []);
+
+  const [viewMode, setViewMode] = useState<"all" | "month" | "custom">("month");
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [startDate, setStartDate] = useState(thirtyDaysAgoIso);
+  const [endDate, setEndDate] = useState(todayIso);
 
   const [classFilter, setClassFilter] = useState<string>("all");
   const [today, setToday] = useState({ present: 0, absent: 0, half: 0, marked: 0 });
@@ -332,6 +342,9 @@ function FacultyDashboard() {
         const [yr, mo] = r.date.split("-").map(Number);
         return yr === selectedYear && mo === selectedMonth;
       }
+      if (viewMode === "custom") {
+        return r.date >= startDate && r.date <= endDate;
+      }
       return true;
     });
 
@@ -371,7 +384,7 @@ function FacultyDashboard() {
         };
       })
       .sort((a, b) => a.percent - b.percent);
-  }, [students, rows, viewMode, selectedMonth, selectedYear, classMap, classFilter]);
+  }, [students, rows, viewMode, selectedMonth, selectedYear, startDate, endDate, classMap, classFilter]);
 
   const summary = useMemo(() => {
     const total = stats.length;
@@ -384,6 +397,28 @@ function FacultyDashboard() {
     const markedDays = stats[0]?.totalDays ?? 0;
     return { total, good, warn, bad, avg, markedDays };
   }, [stats]);
+
+  const applyPreset = (preset: "thisMonth" | "30days" | "60days" | "90days") => {
+    const end = todayIso;
+    let start = end;
+    if (preset === "thisMonth") {
+      start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    } else if (preset === "30days") {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    } else if (preset === "60days") {
+      const d = new Date();
+      d.setDate(d.getDate() - 60);
+      start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    } else if (preset === "90days") {
+      const d = new Date();
+      d.setDate(d.getDate() - 90);
+      start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+    setStartDate(start);
+    setEndDate(end);
+  };
 
   if (loading) {
     return (
@@ -402,9 +437,15 @@ function FacultyDashboard() {
     <section className="space-y-4">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-2xl font-bold">Dashboard</h2>
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            Dashboard
+          </h2>
           <p className="text-muted-foreground text-sm">
-            {viewMode === "all" ? "All time" : `${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}`}{" "}
+            {viewMode === "all"
+              ? "All time"
+              : viewMode === "month"
+                ? `${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}`
+                : `Custom Range (${startDate} to ${endDate})`}{" "}
             · based on {summary.markedDays} marked day{summary.markedDays === 1 ? "" : "s"}.
           </p>
         </div>
@@ -422,12 +463,13 @@ function FacultyDashboard() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={viewMode} onValueChange={(v) => setViewMode(v as "all" | "month")}>
-            <SelectTrigger className="w-32">
+          <Select value={viewMode} onValueChange={(v) => setViewMode(v as "all" | "month" | "custom")}>
+            <SelectTrigger className="w-44">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="month">Monthly</SelectItem>
+              <SelectItem value="custom">Custom Date Range</SelectItem>
               <SelectItem value="all">All Time</SelectItem>
             </SelectContent>
           </Select>
@@ -467,6 +509,54 @@ function FacultyDashboard() {
           )}
         </div>
       </div>
+
+      {viewMode === "custom" && (
+        <Card className="p-4 bg-muted/20 border-primary/20">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Calculator className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold">Custom Calendar Range Calculator</span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap text-xs">
+              <Button variant="outline" size="sm" className="h-7 text-xs bg-background" onClick={() => applyPreset("thisMonth")}>
+                This Month
+              </Button>
+              <Button variant="outline" size="sm" className="h-7 text-xs bg-background" onClick={() => applyPreset("30days")}>
+                Last 30 Days
+              </Button>
+              <Button variant="outline" size="sm" className="h-7 text-xs bg-background" onClick={() => applyPreset("60days")}>
+                Last 60 Days
+              </Button>
+              <Button variant="outline" size="sm" className="h-7 text-xs bg-background" onClick={() => applyPreset("90days")}>
+                Last 90 Days
+              </Button>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 mt-3">
+            <div>
+              <Label className="text-xs text-muted-foreground">Start Date</Label>
+              <Input
+                type="date"
+                value={startDate}
+                max={endDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="mt-1 h-9 text-sm bg-background"
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">End Date</Label>
+              <Input
+                type="date"
+                value={endDate}
+                min={startDate}
+                max={todayIso}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="mt-1 h-9 text-sm bg-background"
+              />
+            </div>
+          </div>
+        </Card>
+      )}
 
       {summary.markedDays === 0 ? (
         <Card>
