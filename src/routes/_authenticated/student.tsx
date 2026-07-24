@@ -192,73 +192,44 @@ function StudentBody({ student }: { student: StudentRow }) {
         </div>
       )}
 
-      <StudentCustomCalculator student={student} />
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
-          <div>
-            <CardTitle>Calendar — {MONTH_NAMES[month-1]} {year}</CardTitle>
-            <CardDescription>Green = present, red = absent, yellow = half-day, grey = holiday.</CardDescription>
-          </div>
-          <div className="flex gap-2">
-            <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
-              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-              <SelectContent>{MONTH_NAMES.map((n, i) => <SelectItem key={i} value={String(i+1)}>{n}</SelectItem>)}</SelectContent>
-            </Select>
-            <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-              <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-              <SelectContent>{[2024, 2025, 2026, 2027].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-7 gap-1 text-xs text-center text-muted-foreground mb-2">
-            {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => <div key={d}>{d}</div>)}
-          </div>
-          <div className="grid grid-cols-7 gap-1">
-            {cells.map((c, i) => {
-              if (!c) return <div key={i} />;
-              const type = dateType.get(c.date);
-              const status = statusByDate[c.date];
-              let cls = "bg-muted/40 text-muted-foreground";
-              let label = "";
-              if (!type) {
-                cls = "bg-muted/20 text-muted-foreground/50"; // future
-              } else if (type === "H") {
-                cls = "bg-muted text-muted-foreground";
-                label = reasonByDate[c.date] ? "H" : (new Date(c.date).getDay() === 0 ? "Sun" : "H");
-              } else {
-                if (status === undefined) {
-                  cls = "bg-muted/10 text-muted-foreground/30";
-                  label = "—";
-                } else if (status === 1) {
-                  cls = "bg-accent/20 text-accent";
-                  label = "P";
-                } else if (status === 0) {
-                  cls = "bg-destructive/20 text-destructive";
-                  label = "A";
-                } else {
-                  cls = "bg-yellow-400/20 text-yellow-800";
-                  label = "½";
-                }
-              }
-              return (
-                <div key={i} className={`aspect-square rounded-md flex flex-col items-center justify-center ${cls}`} title={reasonByDate[c.date] ?? ""}>
-                  <span className="text-sm font-semibold">{c.day}</span>
-                  <span className="text-[10px]">{label}</span>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+      <StudentCustomCalculator
+        student={student}
+        year={year}
+        setYear={setYear}
+        month={month}
+        setMonth={setMonth}
+        cells={cells}
+        dateType={dateType}
+        statusByDate={statusByDate}
+        reasonByDate={reasonByDate}
+      />
 
       <LeaveRequestsSection studentId={student.id} />
     </div>
   );
 }
 
-function StudentCustomCalculator({ student }: { student: StudentRow }) {
+function StudentCustomCalculator({
+  student,
+  year,
+  setYear,
+  month,
+  setMonth,
+  cells,
+  dateType,
+  statusByDate,
+  reasonByDate,
+}: {
+  student: StudentRow;
+  year: number;
+  setYear: (y: number) => void;
+  month: number;
+  setMonth: (m: number) => void;
+  cells: (null | { date: string; day: number })[];
+  dateType: Map<string, "W" | "H">;
+  statusByDate: Record<string, number>;
+  reasonByDate: Record<string, string>;
+}) {
   const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const thirtyDaysAgoIso = useMemo(() => {
     const d = new Date();
@@ -350,19 +321,64 @@ function StudentCustomCalculator({ student }: { student: StudentRow }) {
     setEndDate(end);
   };
 
+  const handleDayClick = (iso: string) => {
+    if (iso > todayIso) return;
+    if (!startDate || (startDate && endDate && startDate !== endDate)) {
+      setStartDate(iso);
+      setEndDate(iso);
+    } else if (startDate && (!endDate || startDate === endDate)) {
+      if (iso < startDate) {
+        setStartDate(iso);
+        setEndDate(startDate);
+      } else {
+        setEndDate(iso);
+      }
+    }
+  };
+
   return (
     <Card className="border-primary/20 shadow-sm bg-gradient-to-br from-background via-card to-muted/20">
       <CardHeader>
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <CardTitle className="flex items-center gap-2 text-xl font-bold">
-              <Calculator className="h-5 w-5 text-primary" /> Calendar Date Range Percentage Calculator
+              <CalendarIcon className="h-5 w-5 text-primary" /> Student Calendar & Range Calculator
             </CardTitle>
             <CardDescription className="mt-1">
-              Select custom start and end dates on the calendar to calculate exact attendance percentage.
+              Select custom dates on the calendar to calculate your exact attendance percentage.
             </CardDescription>
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap text-xs">
+          <div className="flex gap-2 flex-wrap items-center">
+            <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
+              <SelectTrigger className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTH_NAMES.map((n, i) => (
+                  <SelectItem key={i} value={String(i + 1)}>
+                    {n}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+              <SelectTrigger className="w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[2024, 2025, 2026, 2027].map((y) => (
+                  <SelectItem key={y} value={String(y)}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b text-xs">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-muted-foreground font-medium mr-1 flex items-center gap-1">
               <Clock className="h-3.5 w-3.5" /> Quick Presets:
             </span>
@@ -379,9 +395,12 @@ function StudentCustomCalculator({ student }: { student: StudentRow }) {
               Last 90 Days
             </Button>
           </div>
+          <div className="text-muted-foreground">
+            Selected Range: <strong className="text-foreground">{startDate || "—"}</strong> to{" "}
+            <strong className="text-foreground">{endDate || "—"}</strong>
+          </div>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
+
         <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 items-end">
           <div>
             <Label className="text-xs font-semibold text-muted-foreground">Start Date</Label>
@@ -412,7 +431,7 @@ function StudentCustomCalculator({ student }: { student: StudentRow }) {
         </div>
 
         {stats && (
-          <div className="pt-4 border-t space-y-4">
+          <div className="pt-2 space-y-4">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               <div className="p-4 rounded-xl border bg-card/60 flex flex-col justify-between shadow-xs">
                 <span className="text-xs font-medium text-muted-foreground">Range Attendance %</span>
@@ -459,6 +478,71 @@ function StudentCustomCalculator({ student }: { student: StudentRow }) {
             )}
           </div>
         )}
+
+        <div className="pt-3 border-t">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-muted-foreground">
+              Interactive Calendar — {MONTH_NAMES[month - 1]} {year} (Click dates to set range)
+            </span>
+            <span className="text-[11px] text-muted-foreground">
+              P = Present, A = Absent, ½ = Half Day, H = Holiday
+            </span>
+          </div>
+          <div className="grid grid-cols-7 gap-1 text-xs text-center text-muted-foreground mb-2">
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+              <div key={d} className="font-semibold py-0.5">
+                {d}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {cells.map((c, i) => {
+              if (!c) return <div key={i} />;
+              const type = dateType.get(c.date);
+              const status = statusByDate[c.date];
+              const inRange = startDate && endDate && c.date >= startDate && c.date <= endDate;
+
+              let cls = "bg-muted/40 text-muted-foreground";
+              let label = "";
+              if (!type) {
+                cls = "bg-muted/20 text-muted-foreground/50";
+              } else if (type === "H") {
+                cls = "bg-muted text-muted-foreground font-semibold";
+                label = reasonByDate[c.date] ? "H" : new Date(c.date).getDay() === 0 ? "Sun" : "H";
+              } else {
+                if (status === undefined) {
+                  cls = "bg-muted/10 text-muted-foreground/30";
+                  label = "—";
+                } else if (status === 1) {
+                  cls = "bg-accent/20 text-accent font-semibold";
+                  label = "P";
+                } else if (status === 0) {
+                  cls = "bg-destructive/20 text-destructive font-semibold";
+                  label = "A";
+                } else {
+                  cls = "bg-yellow-400/20 text-yellow-800 font-semibold";
+                  label = "½";
+                }
+              }
+
+              return (
+                <button
+                  type="button"
+                  key={i}
+                  onClick={() => handleDayClick(c.date)}
+                  disabled={c.date > todayIso}
+                  className={`aspect-square rounded-md flex flex-col items-center justify-center cursor-pointer transition-all ${cls} ${
+                    inRange ? "ring-2 ring-primary ring-offset-1 z-10 shadow-xs" : ""
+                  }`}
+                  title={reasonByDate[c.date] ?? ""}
+                >
+                  <span className="text-sm font-semibold">{c.day}</span>
+                  <span className="text-[10px]">{label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

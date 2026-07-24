@@ -260,12 +260,25 @@ function FacultyDashboard() {
 
   const [classFilter, setClassFilter] = useState<string>("all");
   const [today, setToday] = useState({ present: 0, absent: 0, half: 0, marked: 0 });
+  const [holidays, setHolidays] = useState<Set<string>>(new Set());
+  const [holidayReasons, setHolidayReasons] = useState<Record<string, string>>({});
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       const { data: userData } = await supabase.auth.getUser();
       const uid = userData.user!.id;
+
+      const { data: hs } = await supabase.from("holidays").select("holiday_date,reason").eq("teacher_id", uid);
+      const hSet = new Set<string>();
+      const hReas: Record<string, string> = {};
+      (hs ?? []).forEach((h: { holiday_date: string; reason: string | null }) => {
+        hSet.add(h.holiday_date);
+        if (h.reason) hReas[h.holiday_date] = h.reason;
+      });
+      setHolidays(hSet);
+      setHolidayReasons(hReas);
+
       const { data: cls } = await supabase.from("classes").select("id,name").eq("teacher_id", uid);
       const cm = new Map<string, string>(
         (cls ?? []).map((c: { id: string; name: string }) => [c.id, c.name] as const),
@@ -329,6 +342,20 @@ function FacultyDashboard() {
       setLoading(false);
     })();
   }, []);
+
+  const dailySummary = useMemo(() => {
+    const map: Record<string, { present: number; total: number; percent: number }> = {};
+    rows.forEach((r) => {
+      if (!map[r.date]) map[r.date] = { present: 0, total: 0, percent: 0 };
+      map[r.date].total += 1;
+      map[r.date].present += Number(r.status);
+    });
+    Object.keys(map).forEach((d) => {
+      const item = map[d];
+      item.percent = item.total ? Math.round((item.present / item.total) * 100) : 0;
+    });
+    return map;
+  }, [rows]);
 
   const stats = useMemo<StudentStat[]>(() => {
     if (students.length === 0) return [];
@@ -615,6 +642,23 @@ function FacultyDashboard() {
             />
           </div>
 
+          <FacultyCalendarCard
+            selectedMonth={selectedMonth}
+            setSelectedMonth={setSelectedMonth}
+            selectedYear={selectedYear}
+            setSelectedYear={setSelectedYear}
+            startDate={startDate}
+            setStartDate={setStartDate}
+            endDate={endDate}
+            setEndDate={setEndDate}
+            setViewMode={setViewMode}
+            dailySummary={dailySummary}
+            holidays={holidays}
+            holidayReasons={holidayReasons}
+            applyPreset={applyPreset}
+            todayIso={todayIso}
+          />
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
@@ -742,6 +786,223 @@ function CategoryCard({
         </p>
         <div className="mt-3 h-2 rounded-full bg-muted overflow-hidden">
           <div className={`h-full ${bar}`} style={{ width: `${pct}%` }} />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function FacultyCalendarCard({
+  selectedMonth,
+  setSelectedMonth,
+  selectedYear,
+  setSelectedYear,
+  startDate,
+  setStartDate,
+  endDate,
+  setEndDate,
+  setViewMode,
+  dailySummary,
+  holidays,
+  holidayReasons,
+  applyPreset,
+  todayIso,
+}: {
+  selectedMonth: number;
+  setSelectedMonth: (m: number) => void;
+  selectedYear: number;
+  setSelectedYear: (y: number) => void;
+  startDate: string;
+  setStartDate: (d: string) => void;
+  endDate: string;
+  setEndDate: (d: string) => void;
+  setViewMode: (v: "all" | "month" | "custom") => void;
+  dailySummary: Record<string, { present: number; total: number; percent: number }>;
+  holidays: Set<string>;
+  holidayReasons: Record<string, string>;
+  applyPreset: (preset: "thisMonth" | "30days" | "60days" | "90days") => void;
+  todayIso: string;
+}) {
+  const firstDow = new Date(selectedYear, selectedMonth - 1, 1).getDay();
+  const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+  const cells: (null | { date: string; day: number })[] = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    cells.push({ date: iso, day: d });
+  }
+
+  const handleCellClick = (iso: string) => {
+    if (iso > todayIso) return;
+    setViewMode("custom");
+    if (!startDate || (startDate && endDate && startDate !== endDate)) {
+      setStartDate(iso);
+      setEndDate(iso);
+    } else if (startDate && (!endDate || startDate === endDate)) {
+      if (iso < startDate) {
+        setStartDate(iso);
+        setEndDate(startDate);
+      } else {
+        setEndDate(iso);
+      }
+    }
+  };
+
+  return (
+    <Card className="border-primary/20 shadow-sm">
+      <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
+        <div>
+          <CardTitle className="flex items-center gap-2 text-xl font-bold">
+            <CalendarDays className="h-5 w-5 text-primary" /> Faculty Attendance Calendar & Date Calculator
+          </CardTitle>
+          <CardDescription className="mt-1">
+            Click dates on the calendar or choose quick range presets to calculate percentage breakdown.
+          </CardDescription>
+        </div>
+        <div className="flex gap-2 flex-wrap items-center">
+          <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
+            <SelectTrigger className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MONTH_NAMES.map((n, i) => (
+                <SelectItem key={i} value={String(i + 1)}>
+                  {n}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
+            <SelectTrigger className="w-28">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[2024, 2025, 2026, 2027].map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b text-xs">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-muted-foreground font-medium mr-1">Quick Presets:</span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => {
+                setViewMode("custom");
+                applyPreset("thisMonth");
+              }}
+            >
+              This Month
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => {
+                setViewMode("custom");
+                applyPreset("30days");
+              }}
+            >
+              Last 30 Days
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => {
+                setViewMode("custom");
+                applyPreset("60days");
+              }}
+            >
+              Last 60 Days
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => {
+                setViewMode("custom");
+                applyPreset("90days");
+              }}
+            >
+              Last 90 Days
+            </Button>
+          </div>
+          <div className="text-muted-foreground">
+            Selection Range: <strong className="text-foreground">{startDate || "—"}</strong> to{" "}
+            <strong className="text-foreground">{endDate || "—"}</strong>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-7 gap-1 text-xs text-center text-muted-foreground mb-1">
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+            <div key={d} className="font-semibold py-1">
+              {d}
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((c, i) => {
+            if (!c) return <div key={i} />;
+            const isSunday = new Date(c.date).getDay() === 0;
+            const isHoliday = holidays.has(c.date);
+            const summary = dailySummary[c.date];
+            const inRange = startDate && endDate && c.date >= startDate && c.date <= endDate;
+
+            let cls = "bg-muted/40 text-muted-foreground";
+            let label = "—";
+            let sub = "";
+
+            if (c.date > todayIso) {
+              cls = "bg-muted/10 text-muted-foreground/30";
+            } else if (isSunday) {
+              cls = "bg-muted text-muted-foreground";
+              label = "Sun";
+            } else if (isHoliday) {
+              cls = "bg-muted text-muted-foreground font-semibold";
+              label = holidayReasons[c.date] ? "H" : "H";
+            } else if (summary) {
+              sub = `${summary.present}/${summary.total}`;
+              label = `${summary.percent}%`;
+              if (summary.percent >= 90) {
+                cls = "bg-accent/20 text-accent font-bold hover:bg-accent/30";
+              } else if (summary.percent >= 75) {
+                cls = "bg-yellow-400/20 text-yellow-800 font-bold hover:bg-yellow-400/30";
+              } else {
+                cls = "bg-destructive/20 text-destructive font-bold hover:bg-destructive/30";
+              }
+            } else {
+              cls = "bg-muted/20 text-muted-foreground/50";
+            }
+
+            return (
+              <button
+                type="button"
+                key={i}
+                onClick={() => handleCellClick(c.date)}
+                disabled={c.date > todayIso}
+                className={`aspect-square rounded-md flex flex-col items-center justify-center p-1 transition-all cursor-pointer ${cls} ${
+                  inRange ? "ring-2 ring-primary ring-offset-1 z-10 shadow-xs" : ""
+                }`}
+                title={
+                  holidayReasons[c.date] ||
+                  (summary ? `${summary.present}/${summary.total} present` : "No attendance marked")
+                }
+              >
+                <span className="text-xs font-semibold">{c.day}</span>
+                <span className="text-[10px] font-medium">{label}</span>
+                {sub && <span className="text-[9px] opacity-75">{sub}</span>}
+              </button>
+            );
+          })}
         </div>
       </CardContent>
     </Card>
