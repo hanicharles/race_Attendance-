@@ -388,6 +388,7 @@ function TeacherStudentCustomCalculator({ student }: { student: Row }) {
     return d.toISOString().slice(0, 10);
   }, []);
 
+  const [activePreset, setActivePreset] = useState<"thisMonth" | "30days" | "60days" | "90days" | "custom">("30days");
   const [startDate, setStartDate] = useState(thirtyDaysAgoIso);
   const [endDate, setEndDate] = useState(todayIso);
   const [loading, setLoading] = useState(false);
@@ -450,6 +451,7 @@ function TeacherStudentCustomCalculator({ student }: { student: Row }) {
   }, [calculate]);
 
   const applyPreset = (preset: "thisMonth" | "30days" | "60days" | "90days") => {
+    setActivePreset(preset);
     const now = new Date();
     const end = now.toISOString().slice(0, 10);
     let start = end;
@@ -473,106 +475,145 @@ function TeacherStudentCustomCalculator({ student }: { student: Row }) {
   };
 
   return (
-    <Card className="border-primary/20 shadow-sm bg-gradient-to-br from-background via-card to-muted/20">
-      <CardHeader>
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-xl font-bold">
-              <Calculator className="h-5 w-5 text-primary" /> Calendar Date Range Calculator
-            </CardTitle>
-            <CardDescription className="mt-1">
-              Calculate {student.name}'s attendance percentage for custom start and end dates.
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-1.5 flex-wrap text-xs">
-            <span className="text-muted-foreground font-medium mr-1 flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5" /> Quick Presets:
-            </span>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => applyPreset("thisMonth")}>
-              This Month
-            </Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => applyPreset("30days")}>
-              Last 30 Days
-            </Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => applyPreset("60days")}>
-              Last 60 Days
-            </Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => applyPreset("90days")}>
-              Last 90 Days
-            </Button>
-          </div>
+    <Card className="rounded-2xl border border-gray-200/80 bg-card p-6 shadow-sm">
+      <div className="flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <h3 className="flex items-center gap-2 text-xl font-bold tracking-tight text-foreground">
+            <Calculator className="h-5 w-5 text-primary" /> Calendar Date Range Calculator
+          </h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Calculate {student.name}&apos;s attendance percentage for custom start and end dates.
+          </p>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 items-end">
-          <div>
-            <Label className="text-xs font-semibold text-muted-foreground">Start Date</Label>
-            <Input
-              type="date"
-              value={startDate}
-              max={endDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="mt-1"
-            />
-          </div>
-          <div>
-            <Label className="text-xs font-semibold text-muted-foreground">End Date</Label>
-            <Input
-              type="date"
-              value={endDate}
-              min={startDate}
-              max={todayIso}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="mt-1"
-            />
-          </div>
-          <div className="sm:col-span-2 md:col-span-1">
-            <Button onClick={calculate} disabled={loading} className="w-full">
-              {loading ? "Calculating…" : "Calculate Percentage"}
-            </Button>
-          </div>
+        <div className="flex items-center gap-2 text-xs flex-wrap">
+          <span className="text-muted-foreground font-medium flex items-center gap-1">
+            <Clock className="h-3.5 w-3.5" /> Quick Presets:
+          </span>
+          <button
+            type="button"
+            onClick={() => applyPreset("thisMonth")}
+            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
+              activePreset === "thisMonth"
+                ? "bg-[#38a169] text-white shadow-xs font-semibold"
+                : "bg-muted/40 hover:bg-muted text-foreground border border-gray-200"
+            }`}
+          >
+            This Month
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset("30days")}
+            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
+              activePreset === "30days"
+                ? "bg-[#38a169] text-white shadow-xs font-semibold"
+                : "bg-muted/40 hover:bg-muted text-foreground border border-gray-200"
+            }`}
+          >
+            Last 30 Days
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset("60days")}
+            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
+              activePreset === "60days"
+                ? "bg-[#38a169] text-white shadow-xs font-semibold"
+                : "bg-muted/40 hover:bg-muted text-foreground border border-gray-200"
+            }`}
+          >
+            Last 60 Days
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset("90days")}
+            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
+              activePreset === "90days"
+                ? "bg-[#38a169] text-white shadow-xs font-semibold"
+                : "bg-muted/40 hover:bg-muted text-foreground border border-gray-200"
+            }`}
+          >
+            Last 90 Days
+          </button>
         </div>
+      </div>
 
-        {stats && (
-          <div className="pt-4 border-t space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              <div className="p-4 rounded-xl border bg-card/60 flex flex-col justify-between shadow-xs">
-                <span className="text-xs font-medium text-muted-foreground">Range Attendance %</span>
-                <div className="mt-2 flex items-baseline justify-between">
-                  <span
-                    className={`text-3xl font-extrabold ${
-                      stats.percent >= 90
-                        ? "text-accent"
-                        : stats.percent >= 75
-                          ? "text-yellow-700"
-                          : "text-destructive"
-                    }`}
-                  >
-                    {stats.percent}%
-                  </span>
-                  <Sparkles className="h-4 w-4 text-primary opacity-70" />
-                </div>
-              </div>
-              <div className="p-4 rounded-xl border bg-card/60 shadow-xs">
-                <span className="text-xs font-medium text-muted-foreground">Working Days</span>
-                <p className="mt-2 text-2xl font-bold">{stats.total}</p>
-              </div>
-              <div className="p-4 rounded-xl border bg-card/60 shadow-xs">
-                <span className="text-xs font-medium text-muted-foreground">Present Days</span>
-                <p className="mt-2 text-2xl font-bold text-accent">{stats.present}</p>
-              </div>
-              <div className="p-4 rounded-xl border bg-card/60 shadow-xs">
-                <span className="text-xs font-medium text-muted-foreground">Absent Days</span>
-                <p className="mt-2 text-2xl font-bold text-destructive">{stats.absent}</p>
-              </div>
-              <div className="p-4 rounded-xl border bg-card/60 shadow-xs">
-                <span className="text-xs font-medium text-muted-foreground">Half Days</span>
-                <p className="mt-2 text-2xl font-bold text-yellow-700">{stats.half}</p>
-              </div>
+      <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-end">
+        <div>
+          <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">Start Date</Label>
+          <Input
+            type="date"
+            value={startDate}
+            max={endDate}
+            onChange={(e) => {
+              setActivePreset("custom");
+              setStartDate(e.target.value);
+            }}
+            className="h-11 rounded-xl border-gray-200 bg-background text-sm font-medium"
+          />
+        </div>
+        <div>
+          <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">End Date</Label>
+          <Input
+            type="date"
+            value={endDate}
+            min={startDate}
+            max={todayIso}
+            onChange={(e) => {
+              setActivePreset("custom");
+              setEndDate(e.target.value);
+            }}
+            className="h-11 rounded-xl border-gray-200 bg-background text-sm font-medium"
+          />
+        </div>
+        <div className="sm:col-span-2 lg:col-span-1">
+          <Button
+            onClick={calculate}
+            disabled={loading}
+            className="h-11 w-full rounded-xl bg-[#1D3557] hover:bg-[#142640] text-white font-semibold text-sm transition-all shadow-xs"
+          >
+            {loading ? "Calculating…" : "Calculate Percentage"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="my-5 border-t border-border/60" />
+
+      {stats && (
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="rounded-xl border border-gray-200/80 bg-background p-4 flex flex-col justify-between shadow-2xs">
+            <span className="text-xs font-medium text-muted-foreground">Range Attendance %</span>
+            <div className="mt-3 flex items-baseline justify-between">
+              <span
+                className={`text-3xl font-extrabold ${
+                  stats.percent >= 90
+                    ? "text-[#22c55e]"
+                    : stats.percent >= 75
+                      ? "text-[#eab308]"
+                      : "text-[#ef4444]"
+                }`}
+              >
+                {stats.percent}%
+              </span>
+              <Sparkles className="h-4 w-4 text-primary opacity-60" />
             </div>
           </div>
-        )}
-      </CardContent>
+          <div className="rounded-xl border border-gray-200/80 bg-background p-4 flex flex-col justify-between shadow-2xs">
+            <span className="text-xs font-medium text-muted-foreground">Working Days</span>
+            <p className="mt-3 text-3xl font-extrabold text-foreground">{stats.total}</p>
+          </div>
+          <div className="rounded-xl border border-gray-200/80 bg-background p-4 flex flex-col justify-between shadow-2xs">
+            <span className="text-xs font-medium text-muted-foreground">Present Days</span>
+            <p className="mt-3 text-3xl font-extrabold text-[#22c55e]">{stats.present}</p>
+          </div>
+          <div className="rounded-xl border border-gray-200/80 bg-background p-4 flex flex-col justify-between shadow-2xs">
+            <span className="text-xs font-medium text-muted-foreground">Absent Days</span>
+            <p className="mt-3 text-3xl font-extrabold text-[#ef4444]">{stats.absent}</p>
+          </div>
+          <div className="rounded-xl border border-gray-200/80 bg-background p-4 flex flex-col justify-between shadow-2xs">
+            <span className="text-xs font-medium text-muted-foreground">Half Days</span>
+            <p className="mt-3 text-3xl font-extrabold text-[#d97706]">{stats.half}</p>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

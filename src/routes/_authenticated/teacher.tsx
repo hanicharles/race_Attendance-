@@ -28,6 +28,7 @@ import {
   Mail,
   Trash2,
   Calculator,
+  Clock,
 } from "lucide-react";
 import {
   Select,
@@ -538,48 +539,125 @@ function FacultyDashboard() {
       </div>
 
       {viewMode === "custom" && (
-        <Card className="p-4 bg-muted/20 border-primary/20">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <Calculator className="h-4 w-4 text-primary" />
-              <span className="text-sm font-semibold">Custom Calendar Range Calculator</span>
+        <Card className="rounded-2xl border border-gray-200/80 bg-card p-6 shadow-sm">
+          <div className="flex items-start justify-between flex-wrap gap-4">
+            <div>
+              <h3 className="flex items-center gap-2 text-xl font-bold tracking-tight text-foreground">
+                <Calculator className="h-5 w-5 text-primary" /> Calendar Date Range Calculator
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Calculate class attendance percentage for custom start and end dates.
+              </p>
             </div>
-            <div className="flex items-center gap-1.5 flex-wrap text-xs">
-              <Button variant="outline" size="sm" className="h-7 text-xs bg-background" onClick={() => applyPreset("thisMonth")}>
+            <div className="flex items-center gap-2 text-xs flex-wrap">
+              <span className="text-muted-foreground font-medium flex items-center gap-1">
+                <Clock className="h-3.5 w-3.5" /> Quick Presets:
+              </span>
+              <button
+                type="button"
+                onClick={() => applyPreset("thisMonth")}
+                className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
+                  startDate === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`
+                    ? "bg-[#38a169] text-white shadow-xs font-semibold"
+                    : "bg-muted/40 hover:bg-muted text-foreground border border-gray-200"
+                }`}
+              >
                 This Month
-              </Button>
-              <Button variant="outline" size="sm" className="h-7 text-xs bg-background" onClick={() => applyPreset("30days")}>
+              </button>
+              <button
+                type="button"
+                onClick={() => applyPreset("30days")}
+                className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
+                  startDate === thirtyDaysAgoIso
+                    ? "bg-[#38a169] text-white shadow-xs font-semibold"
+                    : "bg-muted/40 hover:bg-muted text-foreground border border-gray-200"
+                }`}
+              >
                 Last 30 Days
-              </Button>
-              <Button variant="outline" size="sm" className="h-7 text-xs bg-background" onClick={() => applyPreset("60days")}>
+              </button>
+              <button
+                type="button"
+                onClick={() => applyPreset("60days")}
+                className="rounded-full px-4 py-1.5 text-xs font-medium bg-muted/40 hover:bg-muted text-foreground border border-gray-200 transition-all"
+              >
                 Last 60 Days
-              </Button>
-              <Button variant="outline" size="sm" className="h-7 text-xs bg-background" onClick={() => applyPreset("90days")}>
+              </button>
+              <button
+                type="button"
+                onClick={() => applyPreset("90days")}
+                className="rounded-full px-4 py-1.5 text-xs font-medium bg-muted/40 hover:bg-muted text-foreground border border-gray-200 transition-all"
+              >
                 Last 90 Days
-              </Button>
+              </button>
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 mt-3">
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-end">
             <div>
-              <Label className="text-xs text-muted-foreground">Start Date</Label>
+              <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">Start Date</Label>
               <Input
                 type="date"
                 value={startDate}
                 max={endDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="mt-1 h-9 text-sm bg-background"
+                className="h-11 rounded-xl border-gray-200 bg-background text-sm font-medium"
               />
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground">End Date</Label>
+              <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">End Date</Label>
               <Input
                 type="date"
                 value={endDate}
                 min={startDate}
                 max={todayIso}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="mt-1 h-9 text-sm bg-background"
+                className="h-11 rounded-xl border-gray-200 bg-background text-sm font-medium"
               />
+            </div>
+            <div className="sm:col-span-2 lg:col-span-1">
+              <Button
+                className="h-11 w-full rounded-xl bg-[#1D3557] hover:bg-[#142640] text-white font-semibold text-sm transition-all shadow-xs"
+              >
+                Calculate Percentage
+              </Button>
+            </div>
+          </div>
+
+          <div className="my-5 border-t border-border/60" />
+
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+            <div className="rounded-xl border border-gray-200/80 bg-background p-4 flex flex-col justify-between shadow-2xs">
+              <span className="text-xs font-medium text-muted-foreground">Range Attendance %</span>
+              <div className="mt-3 flex items-baseline justify-between">
+                <span
+                  className={`text-3xl font-extrabold ${
+                    summary.avg >= 90
+                      ? "text-[#22c55e]"
+                      : summary.avg >= 75
+                        ? "text-[#eab308]"
+                        : "text-[#ef4444]"
+                  }`}
+                >
+                  {summary.avg}%
+                </span>
+                <Percent className="h-4 w-4 text-primary opacity-60" />
+              </div>
+            </div>
+            <div className="rounded-xl border border-gray-200/80 bg-background p-4 flex flex-col justify-between shadow-2xs">
+              <span className="text-xs font-medium text-muted-foreground">Working Days</span>
+              <p className="mt-3 text-3xl font-extrabold text-foreground">{summary.markedDays}</p>
+            </div>
+            <div className="rounded-xl border border-gray-200/80 bg-background p-4 flex flex-col justify-between shadow-2xs">
+              <span className="text-xs font-medium text-muted-foreground">Total Students</span>
+              <p className="mt-3 text-3xl font-extrabold text-[#22c55e]">{summary.total}</p>
+            </div>
+            <div className="rounded-xl border border-gray-200/80 bg-background p-4 flex flex-col justify-between shadow-2xs">
+              <span className="text-xs font-medium text-muted-foreground">Below 75%</span>
+              <p className="mt-3 text-3xl font-extrabold text-[#ef4444]">{summary.bad}</p>
+            </div>
+            <div className="rounded-xl border border-gray-200/80 bg-background p-4 flex flex-col justify-between shadow-2xs">
+              <span className="text-xs font-medium text-muted-foreground">75% - 89%</span>
+              <p className="mt-3 text-3xl font-extrabold text-[#d97706]">{summary.warn}</p>
             </div>
           </div>
         </Card>
